@@ -65,7 +65,7 @@ int QmlFmt::InternalRun(QIODevice& input, const QString& path)
                 qstderr << ' ' << msg.message << "\n";
             }
         }
-        return 1;
+        return 2;
     }
 
     const QString reformatted = QmlJS::reformat(document, m_indentSize, m_tabSize);
@@ -73,7 +73,8 @@ int QmlFmt::InternalRun(QIODevice& input, const QString& path)
     // Only continue if we are printing to stdout, in that case we should always print the file content,
     // changed or not. If we are printing diff/overwriting/listing files there will be nothing to do,
     // so we can just skip this.
-    if (source == reformatted && (this->m_options & SkipIdenticalFilesMask) != 0)
+    bool isDifferent = (source != reformatted);
+    if (!isDifferent && (this->m_options & SkipIdenticalFilesMask) != 0)
         return 0;
 
     if (this->m_options.testFlag(Option::ListFileName))
@@ -106,7 +107,7 @@ int QmlFmt::InternalRun(QIODevice& input, const QString& path)
         outFile.write(bytes);
     }
 
-    return 0;
+    return isDifferent ? 1 : 0;
 }
 
 QmlFmt::QmlFmt(Options options, int indentSize, int tabSize)
@@ -139,7 +140,7 @@ int QmlFmt::Run(QStringList paths)
         {
             QFile file(fileOrDir);
             file.open(QFile::ReadOnly | QFile::Text);
-            returnValue |= this->InternalRun(file, fileOrDir);
+            returnValue = std::max(returnValue, this->InternalRun(file, fileOrDir));
         }
         else if (fileInfo.isDir())
         {
@@ -153,13 +154,13 @@ int QmlFmt::Run(QStringList paths)
             {
                 QFile file(iter.next());
                 file.open(QFile::ReadOnly | QFile::Text);
-                returnValue |= this->InternalRun(file, file.fileName());
+                returnValue = std::max(returnValue, this->InternalRun(file, file.fileName()));
             }
         }
         else
         {
             QTextStream(stderr) << "Path is not valid file or directory: " << fileOrDir << "\n";
-            returnValue |= 1;
+            returnValue = 2;
         }
     }
 
